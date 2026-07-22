@@ -6,6 +6,7 @@ using HMS_NewProject_Temp_Humdity_processdata.Database.Interface;
 using HMS_NewProject_Temp_Humdity_processdata.Models.Config;
 using HMS_NewProject_Temp_Humdity_processdata.Service;
 using HMS_NewProject_Temp_Humdity_processdata.Service.Interface;
+using HMS_NewProject_Temp_Humdity_processdata.Services;
 using HMS_NewProject_Temp_Humdity_processdata.Signalr;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
@@ -50,7 +51,7 @@ builder.Services.AddSingleton(appConfig);
 builder.Services.AddSingleton<DeviceSensorService>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IDeviceRedisService, DeviceRedisService>();
-
+builder.Services.AddSingleton<DashboardMockService>();
 //builder.Services.AddSingleton<IHubDeviceMonitor, HubDeviceMonitor>();
 //builder.Services.AddSingleton<IDAOAlarmEvent, DAOAlarmEvent>();
 

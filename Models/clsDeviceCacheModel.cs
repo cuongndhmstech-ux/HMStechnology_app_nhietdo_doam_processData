@@ -8,6 +8,8 @@
 
 		public string? Imei { get; set; }
 
+		public string? CompanyId { get; set; }
+
 		public string? UserId { get; set; }
 		public string? Name { get; set; }
 

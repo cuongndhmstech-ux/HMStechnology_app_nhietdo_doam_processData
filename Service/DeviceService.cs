@@ -1,4 +1,5 @@
 ﻿using HMS_NewProject_Temp_Humdity_processdata.Database.Interface;
+using HMS_NewProject_Temp_Humdity_processdata.DTO.Response;
 using HMS_NewProject_Temp_Humdity_processdata.Models;
 using HMS_NewProject_Temp_Humdity_processdata.Service.Interface;
 
@@ -65,7 +66,6 @@ namespace HMS_NewProject_Temp_Humdity_processdata.Service
 				LastUpdate = dto.LastUpdate
 			};
 		}
-
 
 	}
 }
