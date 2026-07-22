@@ -1,0 +1,6 @@
+@HMS_NewProject_Temp_Humdity_processdata_HostAddress = http://localhost:5015
+
+GET {{HMS_NewProject_Temp_Humdity_processdata_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
