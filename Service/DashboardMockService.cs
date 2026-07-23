@@ -133,9 +133,10 @@ namespace HMS_NewProject_Temp_Humdity_processdata.Services
 							{
 								new() { Id = "D000015", Name = "ESP32-15", RoomId = "L000006", SerialNumber = "868123456789015", TempMin = 22, TempMax = 34, HumidMin = 60, HumidMax = 90 },
 								new() { Id = "D000016", Name = "ESP32-16", RoomId = "L000006", SerialNumber = "868123456789016", TempMin = 22, TempMax = 34, HumidMin = 60, HumidMax = 90 },
-								new() { Id = "D000017", Name = "ESP32-17", RoomId = "L000006", SerialNumber = "868123456789017", TempMin = 22, TempMax = 34, HumidMin = 60, HumidMax = 90 }
-							}
-						},
+								new() { Id = "D000017", Name = "ESP32-17", RoomId = "L000006", SerialNumber = "868123456789017", TempMin = 22, TempMax = 34, HumidMin = 60, HumidMax = 90 },
+                                new() { Id = "D000017", Name = "ESP32-17", RoomId = "L000006", SerialNumber = "868123456789017", TempMin = 22, TempMax = 34, HumidMin = 60, HumidMax = 90 }
+                            }
+                        },
 						new RoomSeed
 						{
 							Id = "L000007", Name = "Nhà Kính 2", Description = "Khu trồng hoa",
@@ -176,8 +177,9 @@ namespace HMS_NewProject_Temp_Humdity_processdata.Services
 					CreatedAt = room.CreatedAt,
 					TotalDevices = devices.Count,
 					OnlineDevices = devices.Count(d => d.Connectivity == ConnectivityStatus.online),
-					AlertCount = devices.Count(d => d.Status == DeviceStatus.warning)
-				};
+					AlertCount = devices.Count(d => d.Status == DeviceStatus.warning),
+                    Devices = devices
+                };
 			}).ToList();
 
 			return Task.FromResult<List<RoomResponseTest>?>(result);
@@ -254,9 +256,25 @@ namespace HMS_NewProject_Temp_Humdity_processdata.Services
 				};
 			}
 
-			var (temp, humid) = GenerateDrifted(seed.Id, seed.TempMin, seed.TempMax, seed.HumidMin, seed.HumidMax);
+            //var (temp, humid) = GenerateDrifted(seed.Id, seed.TempMin, seed.TempMax, seed.HumidMin, seed.HumidMax);
+            double temp = seed.TempMin;
+            double humid = seed.HumidMin;
 
-			var status = seed.ForceWarning
+            if (seed.Id == "D000007")
+            {
+                temp = seed.TempMax + 8.5; // Vượt ngưỡng Max Nhiệt độ (Ví dụ: 27 + 8.5 = 35.5°C)
+            }
+            else if (seed.Id == "D000008")
+            {
+                humid = seed.HumidMax + 15.0; // Vượt ngưỡng Max Độ ẩm (Ví dụ: 80 + 15 = 95%)
+            }
+            else if (seed.Id == "D0000010")
+            {
+                temp = seed.TempMin - 5.0; // Thấp hơn ngưỡng Min Nhiệt độ (Ví dụ: 22 - 5 = 17°C)
+            }
+
+
+            var status = seed.ForceWarning
 				? DeviceStatus.warning
 				: (temp < seed.TempMin || temp > seed.TempMax || humid < seed.HumidMin || humid > seed.HumidMax
 					? DeviceStatus.warning

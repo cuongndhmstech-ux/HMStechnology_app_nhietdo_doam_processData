@@ -9,5 +9,6 @@
 		public int OnlineDevices { get; set; }
 		public int AlertCount { get; set; }
 		public DateTime CreatedAt { get; set; }
-	}
+        public List<DeviceResponseTest> Devices { get; set; } = new();
+    }
 }
