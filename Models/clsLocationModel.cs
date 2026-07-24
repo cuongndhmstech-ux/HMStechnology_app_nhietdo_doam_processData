@@ -21,4 +21,11 @@
 
 		public List<clsDeviceCacheModel>? Devices { get; set; }
 	}
+
+	public class DataResponseForUser()
+	{
+		public List<LocationResponse> Locations { get; set; } = new();
+		public List<clsDeviceCacheModel> DeviceUnassgin { get; set; } = new();
+
+	}
 }

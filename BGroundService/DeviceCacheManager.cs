@@ -45,9 +45,7 @@ namespace HMS_NewProject_Temp_Humdity_processdata.BGroundService
 				var locations = await managerApiClient.GetListClsDeviceCacheModelAsync();
 
 				if (locations == null || !locations.Any())
-				{
 					return;
-				}
 
 				foreach (var location in locations)
 				{
@@ -56,47 +54,170 @@ namespace HMS_NewProject_Temp_Humdity_processdata.BGroundService
 
 					try
 					{
-						await redis.SetLocationAsync(new LocationResponse
-						{
-							LocationId = location.LocationId,
-							UserId = location.UserId,
-							Name = location.Name,
-							Devices = null
-						});
+						// ===========================================================
+						// Location "UNASSIGNED" chỉ dùng để gom dữ liệu từ Manager API.
+						// Không lưu Location này vào Redis.
+						// ===========================================================
 
-						await redis.AddLocationToUser(location.UserId, location.LocationId);
+						bool isUnassigned =
+							string.Equals(location.LocationId,
+								"UNASSIGNED",
+								StringComparison.OrdinalIgnoreCase);
+
+						if (!isUnassigned)
+						{
+							await redis.SetLocationAsync(new LocationResponse
+							{
+								LocationId = location.LocationId,
+								UserId = location.UserId,
+								Name = location.Name,
+								Devices = null
+							});
+
+							await redis.AddLocationToUser(
+								location.UserId,
+								location.LocationId);
+						}
 
 						if (location.Devices == null || !location.Devices.Any())
 							continue;
 
-
-
 						foreach (var device in location.Devices)
 						{
-							device.LocationId = location.LocationId;
+							// =======================================================
+							// Nếu Device thuộc Location thật thì cập nhật LocationId.
+							// Nếu là nhóm UNASSIGNED thì giữ nguyên LocationId=""
+							// theo dữ liệu gốc trong Database.
+							// =======================================================
 
-							if (device.UserId != location.UserId)
+							if (!isUnassigned)
+							{
+								device.LocationId = location.LocationId;
+							}
+
+							if (!isUnassigned &&
+								device.UserId != location.UserId)
 							{
 								_logger.LogWarning(
 									"Device {IMEI} có UserId={DeviceUserId} khác với chủ Location {LocationId} (UserId={LocationUserId})",
-									device.Imei, device.UserId, location.LocationId, location.UserId);
+									device.Imei,
+									device.UserId,
+									location.LocationId,
+									location.UserId);
 							}
+							// dữ liệu mẫu////////////////////////////////////////////////
+							// =======================================================
+							// Sinh dữ liệu mẫu Device Status và Connectivity
+							// =======================================================
 
+							int hash = Math.Abs(device.Imei?.GetHashCode() ?? 0);
+
+							device.status = (hash % 4) switch
+							{
+								0 => DeviceStatus.online,
+								1 => DeviceStatus.offline,
+								2 => DeviceStatus.unknown,
+								_ => DeviceStatus.online
+							};
+
+							device.connectivity = (hash % 4) switch
+							{
+								0 => ConnectivityStatus.strong,
+								1 => ConnectivityStatus.medium,
+								2 => ConnectivityStatus.weak,
+								_ => ConnectivityStatus.none
+							};
+
+							// =======================================================
+							// Sinh dữ liệu mẫu Sensor
+							// =======================================================
+
+							if (device.Sensors != null)
+							{
+								for (int i = 0; i < device.Sensors.Count; i++)
+								{
+									var sensor = device.Sensors[i];
+
+									switch (i % 4)
+									{
+										// Bình thường
+										case 0:
+											sensor.temperature =
+												((sensor.TemperatureMin + sensor.TemperatureMax) / 2)
+												.ToString("0");
+
+											sensor.humidity =
+												((sensor.HumidityMin + sensor.HumidityMax) / 2)
+												.ToString("0");
+											break;
+
+										// Nhiệt độ vượt max
+										case 1:
+											sensor.temperature =
+												(sensor.TemperatureMax + 5)
+												.ToString("0");
+
+											sensor.humidity =
+												((sensor.HumidityMin + sensor.HumidityMax) / 2)
+												.ToString("0");
+											break;
+
+										// Độ ẩm thấp hơn min
+										case 2:
+											sensor.temperature =
+												((sensor.TemperatureMin + sensor.TemperatureMax) / 2)
+												.ToString("0");
+
+											sensor.humidity =
+												(sensor.HumidityMin - 10)
+												.ToString("0");
+											break;
+
+										// Cả nhiệt độ và độ ẩm vượt ngưỡng
+										case 3:
+											sensor.temperature =
+												(sensor.TemperatureMax + 5)
+												.ToString("0");
+
+											sensor.humidity =
+												(sensor.HumidityMax + 10)
+												.ToString("0");
+											break;
+									}
+								}
+							}
+							// dữ liệu mẫu//////////////////////////////////////////////////
+							// Cache thông tin Device
 							await redis.SetDeviceAsync(device.Imei, device);
 
-							await redis.AddDeviceToLocation(
-								location.LocationId,
+							// Mapping User -> Device
+							await redis.AddDeviceToUser(
+								device.UserId,
 								device.Imei);
 
+							// =======================================================
+							// Chỉ Device có Location thật mới thêm vào
+							// location:{locationId}:devices
+							// =======================================================
+
+							if (!isUnassigned)
+							{
+								await redis.AddDeviceToLocation(
+									location.LocationId,
+									device.Imei);
+							}
+
 							_logger.LogInformation(
-								"Cached device {IMEI} -> {LocationId}",
+								"Cached device {IMEI} -> {Location}",
 								device.Imei,
-								location.LocationId);
+								isUnassigned
+									? "UNASSIGNED"
+									: location.LocationId);
 						}
 					}
 					catch (Exception ex)
 					{
-						_logger.LogInformation(
+						_logger.LogError(
 							ex,
 							"Failed to cache location {LocationId}",
 							location.LocationId);
@@ -107,7 +228,7 @@ namespace HMS_NewProject_Temp_Humdity_processdata.BGroundService
 			}
 			catch (Exception ex)
 			{
-				_logger.LogInformation(ex, "LoadDevicesToRedis failed.");
+				_logger.LogError(ex, "LoadDevicesToRedis failed.");
 			}
 		}
 
@@ -165,14 +286,17 @@ namespace HMS_NewProject_Temp_Humdity_processdata.BGroundService
 							}
 							_logger.LogInformation("Deleting device: {IMEI}", device.Imei);
 							await redis.DeleteDeviceAsync(device.Imei);
-							if (!string.IsNullOrEmpty(device.LocationId))
+
+							await redis.RemoveDeviceFromUser(device.UserId, device.Imei);
+
+							if (!string.IsNullOrWhiteSpace(device.LocationId))
 							{
-								await redis.RemoveDeviceFromLocation(device.LocationId, device.Imei);
-								_logger.LogInformation(
-									"Removed device {IMEI} from location {LocationId}",
-									device.Imei,
-									device.LocationId);
+								await redis.RemoveDeviceFromLocation(
+									device.LocationId,
+									device.Imei);
 							}
+
+
 							break;
 						}
 
@@ -226,17 +350,17 @@ namespace HMS_NewProject_Temp_Humdity_processdata.BGroundService
 								location.Name);
 
 							// Nếu location đã tồn tại và đổi chủ (UserId khác) -> gỡ khỏi user cũ trước khi gán user mới
-							//var oldLocation = await redis.GetLocationAsync(location.LocationId);
-							//if (oldLocation != null
-							//	&& !string.IsNullOrEmpty(oldLocation.UserId)
-							//	&& oldLocation.UserId != location.UserId)
-							//{
-							//	await redis.RemoveLocationFromUser(oldLocation.UserId, location.LocationId);
+							var oldLocation = await redis.GetLocationAsync(location.LocationId);
+							if (oldLocation != null
+								&& !string.IsNullOrEmpty(oldLocation.UserId)
+								&& oldLocation.UserId != location.UserId)
+							{
+								await redis.RemoveLocationFromUser(oldLocation.UserId, location.LocationId);
 
-							//	_logger.LogInformation(
-							//		"Location {LocationId} đổi chủ từ {OldUserId} -> {NewUserId}",
-							//		location.LocationId, oldLocation.UserId, location.UserId);
-							//}
+								_logger.LogInformation(
+									"Location {LocationId} đổi chủ từ {OldUserId} -> {NewUserId}",
+									location.LocationId, oldLocation.UserId, location.UserId);
+							}
 
 							// Không set Devices ở đây để tránh ghi đè danh sách device đang có trong Redis
 							await redis.SetLocationAsync(new LocationResponse
@@ -246,7 +370,6 @@ namespace HMS_NewProject_Temp_Humdity_processdata.BGroundService
 								Name = location.Name,
 								Devices = null
 							});
-
 							await redis.AddLocationToUser(location.UserId, location.LocationId);
 
 							_logger.LogDebug("Redis updated successfully. LocationId={LocationId}", location.LocationId);
@@ -264,18 +387,93 @@ namespace HMS_NewProject_Temp_Humdity_processdata.BGroundService
 								{
 									ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver()
 								});
+
 							if (device == null)
 							{
 								_logger.LogInformation("Deserialize device failed.");
 								return;
 							}
+
 							_logger.LogInformation(
-								"Updating device. IMEI={IMEI}, Location={LocationId}",
+								"Updating device. IMEI={IMEI}, UserId={UserId}, LocationId={LocationId}",
 								device.Imei,
+								device.UserId,
 								device.LocationId);
+
+							// ===========================================================
+							// Lấy thông tin Device cũ trong Redis để kiểm tra
+							// có đổi User hoặc đổi Location hay không.
+							// ===========================================================
+							var oldDevice = await redis.GetDeviceAsync(device.Imei);
+
+							// ===========================================================
+							// Nếu Device đổi User
+							// -> Xóa khỏi danh sách Device của User cũ.
+							// ===========================================================
+							if (oldDevice != null &&
+								!string.Equals(oldDevice.UserId, device.UserId, StringComparison.Ordinal))
+							{
+								await redis.RemoveDeviceFromUser(
+									oldDevice.UserId,
+									device.Imei);
+
+								_logger.LogInformation(
+									"Device {IMEI} moved from User {OldUser} -> {NewUser}",
+									device.Imei,
+									oldDevice.UserId,
+									device.UserId);
+							}
+
+							// ===========================================================
+							// Nếu Device đổi Location
+							// -> Xóa khỏi Location cũ.
+							// ===========================================================
+							if (oldDevice != null &&
+								!string.Equals(oldDevice.LocationId, device.LocationId, StringComparison.Ordinal) &&
+								!string.IsNullOrWhiteSpace(oldDevice.LocationId))
+							{
+								await redis.RemoveDeviceFromLocation(
+									oldDevice.LocationId,
+									device.Imei);
+
+								_logger.LogInformation(
+									"Device {IMEI} removed from old Location {LocationId}",
+									device.Imei,
+									oldDevice.LocationId);
+							}
+
+							// ===========================================================
+							// Cập nhật Device vào Redis
+							// ===========================================================
 							await redis.SetDeviceAsync(device.Imei, device);
-							await redis.AddDeviceToLocation(device.LocationId, device.Imei);
-							_logger.LogDebug("Redis updated successfully. IMEI={IMEI}", device.Imei);
+
+							// ===========================================================
+							// Mapping User -> Device
+							// ===========================================================
+							if (!string.IsNullOrWhiteSpace(device.UserId))
+							{
+								await redis.AddDeviceToUser(
+									device.UserId,
+									device.Imei);
+							}
+
+							// ===========================================================
+							// Mapping Location -> Device
+							// Chỉ thêm nếu Device đã được gán Location.
+							// Device chưa gán Location chỉ nằm trong
+							// user:{userId}:devices
+							// ===========================================================
+							if (!string.IsNullOrWhiteSpace(device.LocationId))
+							{
+								await redis.AddDeviceToLocation(
+									device.LocationId,
+									device.Imei);
+							}
+
+							_logger.LogInformation(
+								"Redis updated successfully. IMEI={IMEI}",
+								device.Imei);
+
 							break;
 						}
 				}

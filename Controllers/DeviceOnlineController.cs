@@ -21,8 +21,6 @@ namespace HMS_NewProject_Temp_Humdity_processdata.Controllers
 			_logger = logger;
 		}
 
-
-
 		[HttpPost("query")]
 		public async Task<IActionResult> Query([FromBody] DeviceRequestModel request)
 		{
@@ -41,7 +39,7 @@ namespace HMS_NewProject_Temp_Humdity_processdata.Controllers
 			var result = request.Type switch
 			{
 				DeviceQueryType.GetAll =>
-					Ok(new ApiResponse<List<LocationResponse>>
+					Ok(new ApiResponse<DataResponseForUser>
 					{
 						Success = true,
 						Message = "Lấy danh sách thiết bị thành công",

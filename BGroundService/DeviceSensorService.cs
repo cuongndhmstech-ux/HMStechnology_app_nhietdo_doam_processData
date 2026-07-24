@@ -28,59 +28,59 @@ namespace HMS_NewProject_Temp_Humdity_processdata.BGroundService
 
 		public async Task StartAsync()
 		{
-			try
-			{
-				_logger.LogInformation("Checking MongoDB connection...");
-				bool connected = await _mongoContext.IsConnected();
-				if (!connected)
-				{
-					_logger.LogError("MongoDB connection failed. SignalR client will not start.");
-					return;
-				}
-				_logger.LogInformation("MongoDB connected successfully.");
+			//try
+			//{
+			//	_logger.LogInformation("Checking MongoDB connection...");
+			//	bool connected = await _mongoContext.IsConnected();
+			//	if (!connected)
+			//	{
+			//		_logger.LogError("MongoDB connection failed. SignalR client will not start.");
+			//		return;
+			//	}
+			//	_logger.LogInformation("MongoDB connected successfully.");
 
-				_logger.LogInformation("Connecting to SignalR Hub: {HubUrl}", _hubUrl);
+			//	_logger.LogInformation("Connecting to SignalR Hub: {HubUrl}", _hubUrl);
 
-				_vehicleHubConnection = new HubConnectionBuilder()
-					.WithUrl(_hubUrl)
-					.WithAutomaticReconnect(new[]
-					{
-						TimeSpan.Zero,
-						TimeSpan.FromSeconds(2),
-						TimeSpan.FromSeconds(5),
-						TimeSpan.FromSeconds(10)
-					})
-					.Build();
+			//	_vehicleHubConnection = new HubConnectionBuilder()
+			//		.WithUrl(_hubUrl)
+			//		.WithAutomaticReconnect(new[]
+			//		{
+			//			TimeSpan.Zero,
+			//			TimeSpan.FromSeconds(2),
+			//			TimeSpan.FromSeconds(5),
+			//			TimeSpan.FromSeconds(10)
+			//		})
+			//		.Build();
 
-				_vehicleHubConnection.On<string, string>(
-					"SendMessage",
-					(name, message) => DeviceReceive(name, message));
+			//	_vehicleHubConnection.On<string, string>(
+			//		"SendMessage",
+			//		(name, message) => DeviceReceive(name, message));
 
-				_vehicleHubConnection.Closed += async (error) =>
-				{
-					_logger.LogWarning(error, "SignalR disconnected. Retry connecting manually...");
-					await ManualReconnectAsync();
-				};
+			//	_vehicleHubConnection.Closed += async (error) =>
+			//	{
+			//		_logger.LogWarning(error, "SignalR disconnected. Retry connecting manually...");
+			//		await ManualReconnectAsync();
+			//	};
 
-				_vehicleHubConnection.Reconnecting += (error) =>
-				{
-					_logger.LogWarning(error, "SignalR reconnecting...");
-					return Task.CompletedTask;
-				};
+			//	_vehicleHubConnection.Reconnecting += (error) =>
+			//	{
+			//		_logger.LogWarning(error, "SignalR reconnecting...");
+			//		return Task.CompletedTask;
+			//	};
 
-				_vehicleHubConnection.Reconnected += (connectionId) =>
-				{
-					_logger.LogInformation("SignalR reconnected successfully. ConnectionId={ConnectionId}", connectionId);
-					return Task.CompletedTask;
-				};
+			//	_vehicleHubConnection.Reconnected += (connectionId) =>
+			//	{
+			//		_logger.LogInformation("SignalR reconnected successfully. ConnectionId={ConnectionId}", connectionId);
+			//		return Task.CompletedTask;
+			//	};
 
-				await _vehicleHubConnection.StartAsync();
-				_logger.LogInformation("SignalR connected successfully.");
-			}
-			catch (Exception ex)
-			{
-				_logger.LogError(ex, "Failed to start SignalR client.");
-			}
+			//	await _vehicleHubConnection.StartAsync();
+			//	_logger.LogInformation("SignalR connected successfully.");
+			//}
+			//catch (Exception ex)
+			//{
+			//	_logger.LogError(ex, "Failed to start SignalR client.");
+			//}
 		}
 
 

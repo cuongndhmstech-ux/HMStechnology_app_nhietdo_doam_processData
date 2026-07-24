@@ -34,6 +34,7 @@ namespace HMS_NewProject_Temp_Humdity_processdata.Service
 		private static string UserLocationsKey(string userId) => $"user:{userId}:locations";
 		private static string DeviceLocationKey(string imei) => $"device:{imei}:location";
 		private static string LocationOwnerKey(string locationId) => $"location:{locationId}:owner";
+		private static string UserDevicesKey(string userId) => $"user:{userId}:devices";
 
 		// ================== DEVICE ==================
 		public async Task SetDeviceAsync(string IMEI, clsDeviceCacheModel deviceCacheModel)
@@ -108,91 +109,156 @@ namespace HMS_NewProject_Temp_Humdity_processdata.Service
 			}
 		}
 
-		public async Task<List<LocationResponse>> GetLocationsWithDevicesByUserAsync(string userId)
+		public async Task<DataResponseForUser> GetLocationsWithDevicesByUserAsync(string userId)
 		{
+			var response = new DataResponseForUser();
+
 			if (!IsRedisAvailable())
-				return new List<LocationResponse>();
+				return response;
 
 			try
 			{
-				_logger.LogInformation("Getting locations + devices from Redis. UserId={UserId}", userId);
+				_logger.LogInformation(
+					"Getting locations + devices from Redis. UserId={UserId}",
+					userId);
 
-				// 1. Lấy danh sách LocationId thuộc user (từ Set: user:{userId}:locations)
+				// ===========================================================
+				// 1. Lấy danh sách Location của User
+				// ===========================================================
+
 				var locationIds = await db!.SetMembersAsync(UserLocationsKey(userId));
-				if (locationIds.Length == 0)
-				{
-					_logger.LogInformation("User {UserId} không có location nào.", userId);
-					return new List<LocationResponse>();
-				}
 
-				// 2. Lấy trước toàn bộ imei theo từng location (để gộp query Mongo 1 lần)
+				// ===========================================================
+				// 2. Lấy toàn bộ Device của User
+				// ===========================================================
+
+				var userDeviceIds = await db.SetMembersAsync(UserDevicesKey(userId));
+
+				// ===========================================================
+				// 3. Chuẩn bị dữ liệu để query Mongo đúng 1 lần
+				// ===========================================================
+
 				var locationImeiMap = new Dictionary<string, List<string>>();
 				var allImeis = new HashSet<string>();
 
 				foreach (var locId in locationIds)
 				{
 					var locationId = locId.ToString();
-					var imeis = await db!.SetMembersAsync(LocationDevicesKey(locationId));
-					var imeiStrings = imeis.Select(x => x.ToString()).ToList();
+
+					var imeis = await db.SetMembersAsync(LocationDevicesKey(locationId));
+
+					var imeiStrings = imeis
+						.Select(x => x.ToString())
+						.ToList();
 
 					locationImeiMap[locationId] = imeiStrings;
+
 					foreach (var imei in imeiStrings)
 						allImeis.Add(imei);
 				}
 
-				// 3. Gọi Mongo DUY NHẤT 1 lần cho toàn bộ imei của user (thay vì gọi lặp trong foreach)
+				// ===========================================================
+				// 4. Tìm các Device chưa gán Location
+				// ===========================================================
+
+				var unassignedDevices = new List<clsDeviceCacheModel>();
+
+				foreach (var deviceId in userDeviceIds)
+				{
+					var imei = deviceId.ToString();
+
+					var device = await GetDeviceAsync(imei);
+
+					if (device == null)
+						continue;
+
+					allImeis.Add(imei);
+
+					if (string.IsNullOrWhiteSpace(device.LocationId))
+					{
+						unassignedDevices.Add(device);
+					}
+				}
+
+				// ===========================================================
+				// 5. Query Mongo đúng 1 lần
+				// ===========================================================
+
 				var deviceDataMap = allImeis.Count > 0
 					? await _deviceService.GetClsDeviceLogLastUpdateByImeis(allImeis)
 					: new Dictionary<string, clsDeviceLogModel>();
 
-				var result = new List<LocationResponse>();
+				// ===========================================================
+				// 6. Ghép Device vào từng Location
+				// ===========================================================
 
 				foreach (var locId in locationIds)
 				{
 					var locationId = locId.ToString();
 
-					// 4. Lấy thông tin location (từ String: location:{locationId})
 					var location = await GetLocationAsync(locationId);
+
 					if (location == null)
 					{
-						_logger.LogWarning("Location {LocationId} có trong Set nhưng không tìm thấy dữ liệu.", locationId);
+						_logger.LogWarning(
+							"Location {LocationId} có trong Set nhưng không tìm thấy dữ liệu.",
+							locationId);
+
 						continue;
 					}
 
-					var imeis = locationImeiMap[locationId];
-					var devices = new List<clsDeviceCacheModel>();
+					location.Devices = new List<clsDeviceCacheModel>();
 
-					foreach (var imei in imeis)
+					foreach (var imei in locationImeiMap[locationId])
 					{
 						var device = await GetDeviceAsync(imei);
-						if (device != null)
-						{
-							if (deviceDataMap.TryGetValue(imei, out var log))
-							{
-								device.Sensors = log.Sensors;
-							}
 
-							devices.Add(device);
+						if (device == null)
+							continue;
+
+						if (deviceDataMap.TryGetValue(imei, out var log))
+						{
+							device.Sensors = log.Sensors;
+							device.LastUpdate = log.LastUpdate;
 						}
+
+						location.Devices.Add(device);
 					}
 
-					_logger.LogInformation(
-						"Location {LocationId} ({Name}) có {DeviceCount} devices.",
-						location.LocationId,
-						location.Name,
-						devices.Count);
-
-					location.Devices = devices;
-					result.Add(location);
+					response.Locations.Add(location);
 				}
 
-				_logger.LogInformation("Trả về {LocationCount} locations cho user {UserId}.", result.Count, userId);
-				return result;
+				// ===========================================================
+				// 7. Cập nhật Sensor cho Device chưa gán Location
+				// ===========================================================
+
+				foreach (var device in unassignedDevices)
+				{
+					if (deviceDataMap.TryGetValue(device.Imei!, out var log))
+					{
+						device.Sensors = log.Sensors;
+						device.LastUpdate = log.LastUpdate;
+					}
+				}
+
+				response.DeviceUnassgin = unassignedDevices;
+
+				_logger.LogInformation(
+					"User {UserId}: {LocationCount} locations, {DeviceCount} unassigned devices.",
+					userId,
+					response.Locations.Count,
+					response.DeviceUnassgin.Count);
+
+				return response;
 			}
 			catch (Exception ex)
 			{
-				_logger.LogError(ex, "lỗi redis lấy location + devices theo UserId={UserId}", userId);
-				return new List<LocationResponse>();
+				_logger.LogError(
+					ex,
+					"lỗi redis lấy location + devices theo UserId={UserId}",
+					userId);
+
+				return response;
 			}
 		}
 
@@ -418,6 +484,41 @@ namespace HMS_NewProject_Temp_Humdity_processdata.Service
 				return null;
 			}
 		}
+
+		public async Task AddDeviceToUser(string userId, string imei)
+		{
+			if (!IsRedisAvailable()) return;
+
+			try
+			{
+				await db!.SetAddAsync(UserDevicesKey(userId), imei);
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex,
+					"lỗi thêm device {IMEI} vào user {UserId}",
+					imei,
+					userId);
+			}
+		}
+
+		public async Task RemoveDeviceFromUser(string userId, string imei)
+		{
+			if (!IsRedisAvailable()) return;
+
+			try
+			{
+				await db!.SetRemoveAsync(UserDevicesKey(userId), imei);
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex,
+					"lỗi xóa device {IMEI} khỏi user {UserId}",
+					imei,
+					userId);
+			}
+		}
+
 	}
 
 	public class LocationWithDevicesResponse

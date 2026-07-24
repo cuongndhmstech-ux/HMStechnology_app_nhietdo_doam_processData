@@ -17,14 +17,8 @@
 
 		public DateTime? TimeStamp { get; set; } = DateTime.Now;
 
-		public double? TemperatureMin { get; set; }
-
-		public double? TemperatureMax { get; set; }
-
-		public int? HumidityMin { get; set; }
-
-		public int? HumidityMax { get; set; }
-
+		public DeviceStatus status { get; set; }
+		public ConnectivityStatus connectivity { get; set; }
 		public List<Sensor>? Sensors { get; set; }
 		public DateTime? LastUpdate { get; set; } = DateTime.UtcNow;
 	}

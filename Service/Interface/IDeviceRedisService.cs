@@ -12,7 +12,7 @@ namespace HMS_NewProject_Temp_Humdity_processdata.Service.Interface
 
 		Task<List<clsDeviceCacheModel>> GetAllDevicesAsync();
 
-		Task<List<LocationResponse>> GetLocationsWithDevicesByUserAsync(string userId);
+		Task<DataResponseForUser> GetLocationsWithDevicesByUserAsync(string userId);
 
 		Task SetLocationAsync(LocationResponse location);
 
@@ -36,6 +36,10 @@ namespace HMS_NewProject_Temp_Humdity_processdata.Service.Interface
 
 		Task DeleteLocationAsync(string locationId, string userId);
 		Task<string?> GetUserIdByImeiAsync(string imei);
+
+		Task AddDeviceToUser(string userId, string imei);
+
+		Task RemoveDeviceFromUser(string userId, string imei);
 
 
 	}
