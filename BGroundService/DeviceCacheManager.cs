@@ -132,6 +132,9 @@ namespace HMS_NewProject_Temp_Humdity_processdata.BGroundService
 							// Sinh dữ liệu mẫu Sensor
 							// =======================================================
 
+
+
+
 							if (device.Sensors != null)
 							{
 								for (int i = 0; i < device.Sensors.Count; i++)
@@ -143,44 +146,44 @@ namespace HMS_NewProject_Temp_Humdity_processdata.BGroundService
 										// Bình thường
 										case 0:
 											sensor.temperature =
-												((sensor.TemperatureMin + sensor.TemperatureMax) / 2)
+												((device.TemperatureMin + device.TemperatureMax) / 2)
 												.ToString("0");
 
 											sensor.humidity =
-												((sensor.HumidityMin + sensor.HumidityMax) / 2)
+												((device.HumidityMin + device.HumidityMax) / 2)
 												.ToString("0");
 											break;
 
 										// Nhiệt độ vượt max
 										case 1:
 											sensor.temperature =
-												(sensor.TemperatureMax + 5)
+												(device.TemperatureMax + 5)
 												.ToString("0");
 
 											sensor.humidity =
-												((sensor.HumidityMin + sensor.HumidityMax) / 2)
+												((device.HumidityMin + device.HumidityMax) / 2)
 												.ToString("0");
 											break;
 
 										// Độ ẩm thấp hơn min
 										case 2:
 											sensor.temperature =
-												((sensor.TemperatureMin + sensor.TemperatureMax) / 2)
+												((device.TemperatureMin + device.TemperatureMax) / 2)
 												.ToString("0");
 
 											sensor.humidity =
-												(sensor.HumidityMin - 10)
+												(device.HumidityMin - 10)
 												.ToString("0");
 											break;
 
 										// Cả nhiệt độ và độ ẩm vượt ngưỡng
 										case 3:
 											sensor.temperature =
-												(sensor.TemperatureMax + 5)
+												(device.TemperatureMax + 5)
 												.ToString("0");
 
 											sensor.humidity =
-												(sensor.HumidityMax + 10)
+												(device.HumidityMax + 10)
 												.ToString("0");
 											break;
 									}

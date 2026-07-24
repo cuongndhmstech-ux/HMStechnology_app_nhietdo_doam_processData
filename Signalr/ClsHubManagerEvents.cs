@@ -22,5 +22,17 @@ namespace HMS_NewProject_Temp_Humdity_processdata.Signalr
 			_logger.LogWarning("[ManagerEvents] Client disconnected: {ConnId}", Context.ConnectionId);
 			await base.OnDisconnectedAsync(exception);
 		}
+
+		public async Task SendMessage(string eventName, string payload)
+		{
+			_logger.LogInformation(
+				"[ManagerEvents] Broadcast {EventName}",
+				eventName);
+
+			await Clients.All.SendAsync(
+				"SendMessage",
+				eventName,
+				payload);
+		}
 	}
 }

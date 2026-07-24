@@ -25,24 +25,10 @@ namespace HMS_NewProject_Temp_Humdity_processdata.Models
 		weak, // 4G yếu
 		none, // Không kết nối
 	}
-	public class Threshold
-	{
-		public double MinTemperature { get; set; }
-		public double MaxTemperature { get; set; }
-		public double MinHumidity { get; set; }
-		public double MaxHumidity { get; set; }
-	}
 	public class Sensor
 	{
 
 		public string? NameSensor { get; set; }
-		public double TemperatureMin { get; set; }
-
-		public double TemperatureMax { get; set; }
-
-		public double HumidityMin { get; set; }
-
-		public double HumidityMax { get; set; }
 
 		public string? humidity { get; set; }
 

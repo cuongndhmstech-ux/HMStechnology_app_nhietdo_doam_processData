@@ -8,7 +8,6 @@
 
 		public string? Name { get; set; }
 
-		public string? Description { get; set; }
 	}
 
 	public class LocationResponse
@@ -18,6 +17,7 @@
 		public string? UserId { get; set; }
 
 		public string? Name { get; set; }
+		public DateTime? CreatedAt { get; set; }
 
 		public List<clsDeviceCacheModel>? Devices { get; set; }
 	}

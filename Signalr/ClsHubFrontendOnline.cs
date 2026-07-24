@@ -1,10 +1,8 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.SignalR;
+﻿using Microsoft.AspNetCore.SignalR;
 
 namespace HMS_NewProject_Temp_Humdity_processdata.Signalr
 {
 
-	[Authorize]
 	public class ClsHubFrontendOnline : Hub
 	{
 		private readonly ILogger<ClsHubFrontendOnline> _logger;
